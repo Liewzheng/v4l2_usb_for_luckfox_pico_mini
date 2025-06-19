@@ -1,6 +1,6 @@
-# Makefile for PC client program
+# Makefile for PC client program - High Performance Edition
 CC = gcc
-CFLAGS = -Wall -Wextra -O2 -std=c99 -D_POSIX_C_SOURCE=199309L
+CFLAGS = -Wall -Wextra -O3 -std=c99 -D_POSIX_C_SOURCE=199309L -march=native -mtune=native
 LDFLAGS = -lrt -lpthread
 
 # 目标文件
@@ -13,7 +13,12 @@ all: $(TARGET)
 # 编译规则
 $(TARGET): $(SOURCE)
 	$(CC) $(CFLAGS) -o $(TARGET) $(SOURCE) $(LDFLAGS)
-	@echo "Build complete: $(TARGET)"
+	@echo "Build complete: $(TARGET) (High Performance Edition)"
+	@echo "Features:"
+	@echo "  • -O3 optimization for maximum performance"
+	@echo "  • -march=native for CPU-specific optimizations"
+	@echo "  • Large socket buffers (8MB)"
+	@echo "  • TCP_NODELAY for low latency"
 
 # 清理
 clean:
