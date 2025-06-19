@@ -1,3 +1,5 @@
+#define _GNU_SOURCE
+
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -22,8 +24,6 @@
 #define HEIGHT 1296
 #define PIXELFORMAT V4L2_PIX_FMT_SBGGR10
 #define BUFFER_COUNT 3  // 减少缓冲区数量
-#define TEMP_FILE_TEMPLATE "/dev/shm/raw_temp_%d.BG10"
-#define MAX_TEMP_FILES 2  // 只使用2个临时文件
 
 // USB传输配置
 #define DEFAULT_PORT 8888
@@ -62,10 +62,25 @@ static inline uint64_t get_time_ns() {
     return (uint64_t)ts.tv_sec * 1000000000ULL + (uint64_t)ts.tv_nsec;
 }
 
-// 信号处理
+// 信号处理 - 增强版，强制关闭所有阻塞调用
 void signal_handler(int sig) {
     printf("\nReceived signal %d, shutting down...\n", sig);
     running = 0;
+    
+    // 强制关闭服务器socket，打断accept()阻塞
+    if (server_fd >= 0) {
+        shutdown(server_fd, SHUT_RDWR);
+    }
+    
+    // 关闭客户端连接，打断发送阻塞
+    if (client_fd >= 0) {
+        shutdown(client_fd, SHUT_RDWR);
+    }
+    
+    // 通知条件变量，唤醒等待的线程
+    pthread_mutex_lock(&frame_mutex);
+    pthread_cond_broadcast(&frame_ready);
+    pthread_mutex_unlock(&frame_mutex);
 }
 
 int xioctl(int fd, int request, void *arg) {
@@ -223,42 +238,6 @@ int stop_streaming_mp(int fd) {
     }
     
     printf("Streaming stopped\n");
-    return 0;
-}
-
-// 保存临时文件 - 优化版本，只使用2个文件轮转
-int save_temp_frame(void *data, size_t size, uint32_t frame_id) {
-    static char current_filename[256] = "";
-    static char old_filename[256] = "";
-    char new_filename[256];
-    
-    // 生成新文件名
-    snprintf(new_filename, sizeof(new_filename), TEMP_FILE_TEMPLATE, frame_id % MAX_TEMP_FILES);
-    
-    // 删除旧文件（如果存在且不是当前文件）
-    if (strlen(old_filename) > 0 && strcmp(old_filename, new_filename) != 0) {
-        unlink(old_filename);
-    }
-    
-    // 写入新文件
-    FILE *fp = fopen(new_filename, "wb");
-    if (!fp) {
-        perror("Failed to create temp file");
-        return -1;
-    }
-    
-    size_t written = fwrite(data, 1, size, fp);
-    fclose(fp);
-    
-    if (written != size) {
-        printf("Warning: temp file write incomplete\n");
-        return -1;
-    }
-    
-    // 更新文件名记录
-    strcpy(old_filename, current_filename);
-    strcpy(current_filename, new_filename);
-    
     return 0;
 }
 
@@ -448,13 +427,6 @@ int capture_loop(int fd, struct buffer *buffers, int buffer_count) {
         
         uint64_t timestamp = get_time_ns();
         
-        // 只在有客户端连接时保存临时文件，减少磁盘I/O
-        if (client_connected) {
-            if (save_temp_frame(buffers[buf_index].start[0], bytes_used, frame_counter) < 0) {
-                printf("Warning: failed to save temp frame %d\n", frame_counter);
-            }
-        }
-        
         // 通知USB发送线程（仅在有客户端时）
         if (client_connected) {
             pthread_mutex_lock(&frame_mutex);
@@ -479,10 +451,7 @@ int capture_loop(int fd, struct buffer *buffers, int buffer_count) {
         
         // 统计信息 - 减少输出频率，每5秒输出一次
         uint64_t current_time = get_time_ns();
-        if (current_time - last_stats_time >= 5000000000ULL) {  // 5秒
-            // 检查/dev/shm使用情况
-            system("df -h /dev/shm | tail -1 | awk '{print \"[SHMDISK]\" $3 \"/\" $2 \" (\" $5 \")\"}'");
-            
+        if (current_time - last_stats_time >= 5000000000ULL) {  // 5秒            
             printf("Frame %d, FPS: %d, Bytes: %zu, Connected: %s\n", 
                    frame_counter, frames_in_second/5, bytes_used, 
                    client_connected ? "YES" : "NO");
@@ -515,15 +484,6 @@ int main(int argc, char *argv[]) {
     // 检查系统资源
     printf("Checking system resources...\n");
     system("free -m | head -2 | tail -1 | awk '{print \"Memory: \" $3 \"/\" $2 \" MB used\"}'");
-    system("df -h /dev/shm | tail -1 | awk '{print \"/dev/shm: \" $3 \"/\" $2 \" used (\" $5 \")\"}'");
-    
-    // 清理旧的临时文件
-    printf("Cleaning old temp files...\n");
-    for (int i = 0; i < MAX_TEMP_FILES; i++) {
-        char filename[256];
-        snprintf(filename, sizeof(filename), TEMP_FILE_TEMPLATE, i);
-        unlink(filename);  // 删除可能存在的旧文件
-    }
     
     // 设置信号处理
     signal(SIGINT, signal_handler);
@@ -604,13 +564,6 @@ cleanup:
     
     if (server_fd >= 0) {
         close(server_fd);
-    }
-    
-    // 清理临时文件
-    for (int i = 0; i < MAX_TEMP_FILES; i++) {
-        char filename[256];
-        snprintf(filename, sizeof(filename), TEMP_FILE_TEMPLATE, i);
-        unlink(filename);
     }
     
     printf("Program terminated\n");
