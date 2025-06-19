@@ -2,16 +2,21 @@
 #include <winsock2.h>
 #include <ws2tcpip.h>
 #include <windows.h>
-#pragma comment(lib, "ws2_32.lib")
-#define close closesocket
+// 注意：使用编译器链接选项而不是pragma
 #define ssize_t int
 typedef int socklen_t;
+typedef SOCKET socket_t;
+#define INVALID_SOCKET_FD INVALID_SOCKET
+#define close_socket closesocket
 #else
 #include <sys/socket.h>
 #include <netinet/in.h>
 #include <arpa/inet.h>
 #include <unistd.h>
 #include <sys/time.h>
+typedef int socket_t;
+#define INVALID_SOCKET_FD -1
+#define close_socket close
 #endif
 
 #include <stdio.h>
@@ -24,7 +29,7 @@ typedef int socklen_t;
 #include <sys/stat.h>
 
 // 默认配置
-#define DEFAULT_SERVER_IP "172.32.0.100"
+#define DEFAULT_SERVER_IP "172.32.0.93"
 #define DEFAULT_PORT 8888
 #define OUTPUT_DIR "./received_frames"
 #define MAX_FILENAME_LEN 256
@@ -44,7 +49,7 @@ struct frame_header {
 
 // 全局状态
 volatile int running = 1;
-int sock_fd = -1;
+socket_t sock_fd = INVALID_SOCKET_FD;
 
 // 统计信息
 struct stats {
@@ -153,12 +158,12 @@ int create_output_dir(const char *dir) {
 }
 
 // 可靠地接收指定字节数的数据
-int recv_full(int sock, void *buffer, size_t size) {
+int recv_full(socket_t sock, void *buffer, size_t size) {
     size_t received = 0;
     uint8_t *ptr = (uint8_t*)buffer;
     
     while (received < size && running) {
-        ssize_t result = recv(sock, (char*)(ptr + received), size - received, 0);
+        ssize_t result = recv(sock, (char*)(ptr + received), (int)(size - received), 0);
         
         if (result <= 0) {
             if (result == 0) {
@@ -180,18 +185,18 @@ int recv_full(int sock, void *buffer, size_t size) {
 }
 
 // 连接到服务器
-int connect_to_server(const char *ip, int port) {
-    int sock;
+socket_t connect_to_server(const char *ip, int port) {
+    socket_t sock;
     struct sockaddr_in server_addr;
     
     sock = socket(AF_INET, SOCK_STREAM, 0);
-    if (sock < 0) {
+    if (sock == INVALID_SOCKET_FD) {
 #ifdef _WIN32
         printf("socket failed: %d\n", WSAGetLastError());
 #else
         perror("socket failed");
 #endif
-        return -1;
+        return INVALID_SOCKET_FD;
     }
     
     // 设置接收超时
@@ -199,8 +204,8 @@ int connect_to_server(const char *ip, int port) {
     DWORD timeout = RECV_TIMEOUT_SEC * 1000; // Windows uses milliseconds
     if (setsockopt(sock, SOL_SOCKET, SO_RCVTIMEO, (char*)&timeout, sizeof(timeout)) < 0) {
         printf("setsockopt failed: %d\n", WSAGetLastError());
-        close(sock);
-        return -1;
+        close_socket(sock);
+        return INVALID_SOCKET_FD;
     }
 #else
     struct timeval timeout;
@@ -208,8 +213,8 @@ int connect_to_server(const char *ip, int port) {
     timeout.tv_usec = 0;
     if (setsockopt(sock, SOL_SOCKET, SO_RCVTIMEO, &timeout, sizeof(timeout)) < 0) {
         perror("setsockopt failed");
-        close(sock);
-        return -1;
+        close_socket(sock);
+        return INVALID_SOCKET_FD;
     }
 #endif
     
@@ -219,8 +224,8 @@ int connect_to_server(const char *ip, int port) {
     
     if (inet_pton(AF_INET, ip, &server_addr.sin_addr) <= 0) {
         printf("Invalid server IP address: %s\n", ip);
-        close(sock);
-        return -1;
+        close_socket(sock);
+        return INVALID_SOCKET_FD;
     }
     
     printf("Connecting to %s:%d...\n", ip, port);
@@ -231,8 +236,8 @@ int connect_to_server(const char *ip, int port) {
 #else
         perror("connect failed");
 #endif
-        close(sock);
-        return -1;
+        close_socket(sock);
+        return INVALID_SOCKET_FD;
     }
     
     printf("Connected successfully!\n");
@@ -324,7 +329,7 @@ void print_stats() {
 }
 
 // 主接收循环
-int receive_loop(int sock) {
+int receive_loop(socket_t sock) {
     uint8_t *frame_buffer = NULL;
     size_t buffer_size = 0;
     int save_enabled = 1;
@@ -477,7 +482,7 @@ int main(int argc, char *argv[]) {
     
     // 连接到服务器
     sock_fd = connect_to_server(server_ip, port);
-    if (sock_fd < 0) {
+    if (sock_fd == INVALID_SOCKET_FD) {
         cleanup_network();
         return 1;
     }
@@ -486,7 +491,7 @@ int main(int argc, char *argv[]) {
     int result = receive_loop(sock_fd);
     
     // 清理
-    close(sock_fd);
+    close_socket(sock_fd);
     cleanup_network();
     
     // 打印最终统计

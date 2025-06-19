@@ -21,15 +21,15 @@
 #define WIDTH 2048
 #define HEIGHT 1296
 #define PIXELFORMAT V4L2_PIX_FMT_SBGGR10
-#define BUFFER_COUNT 4
+#define BUFFER_COUNT 3  // 减少缓冲区数量
 #define TEMP_FILE_TEMPLATE "/dev/shm/raw_temp_%d.BG10"
-#define MAX_TEMP_FILES 8
+#define MAX_TEMP_FILES 2  // 只使用2个临时文件
 
 // USB传输配置
 #define DEFAULT_PORT 8888
-#define DEFAULT_SERVER_IP "172.32.0.100"  // Luckfox Pico 默认IP
+#define DEFAULT_SERVER_IP "172.32.0.93"  // Luckfox Pico 默认IP
 #define HEADER_SIZE 32
-#define CHUNK_SIZE 65536  // 64KB chunks for network transfer
+#define CHUNK_SIZE 32768  // 减少块大小为32KB
 
 // 多平面缓冲区结构
 struct buffer {
@@ -226,20 +226,40 @@ int stop_streaming_mp(int fd) {
     return 0;
 }
 
-// 保存临时文件
+// 保存临时文件 - 优化版本，只使用2个文件轮转
 int save_temp_frame(void *data, size_t size, uint32_t frame_id) {
-    char filename[256];
-    snprintf(filename, sizeof(filename), TEMP_FILE_TEMPLATE, frame_id % MAX_TEMP_FILES);
+    static char current_filename[256] = "";
+    static char old_filename[256] = "";
+    char new_filename[256];
     
-    FILE *fp = fopen(filename, "wb");
+    // 生成新文件名
+    snprintf(new_filename, sizeof(new_filename), TEMP_FILE_TEMPLATE, frame_id % MAX_TEMP_FILES);
+    
+    // 删除旧文件（如果存在且不是当前文件）
+    if (strlen(old_filename) > 0 && strcmp(old_filename, new_filename) != 0) {
+        unlink(old_filename);
+    }
+    
+    // 写入新文件
+    FILE *fp = fopen(new_filename, "wb");
     if (!fp) {
+        perror("Failed to create temp file");
         return -1;
     }
     
     size_t written = fwrite(data, 1, size, fp);
     fclose(fp);
     
-    return (written == size) ? 0 : -1;
+    if (written != size) {
+        printf("Warning: temp file write incomplete\n");
+        return -1;
+    }
+    
+    // 更新文件名记录
+    strcpy(old_filename, current_filename);
+    strcpy(current_filename, new_filename);
+    
+    return 0;
 }
 
 // 创建TCP服务器
@@ -363,13 +383,16 @@ void* usb_sender_thread(void* arg) {
             // 发送帧数据
             if (send_frame(client_fd, current_frame.data, current_frame.size, 
                           current_frame.frame_id, current_frame.timestamp) < 0) {
-                printf("Failed to send frame, client disconnected\n");
+                printf("Client disconnected (frame %d)\n", current_frame.frame_id);
                 close(client_fd);
                 client_connected = 0;
+                
+                // 清理当前帧数据，避免内存泄漏
+                current_frame.data = NULL;
+            } else {
+                // 发送成功，清理当前帧
+                current_frame.data = NULL;
             }
-            
-            // 清除当前帧
-            current_frame.data = NULL;
         }
         
         pthread_mutex_unlock(&frame_mutex);
@@ -415,38 +438,54 @@ int capture_loop(int fd, struct buffer *buffers, int buffer_count) {
         int buf_index;
         size_t bytes_used;
         if (dequeue_buffer_mp(fd, &buf_index, &bytes_used) < 0) {
-            perror("dequeue failed");
+            if (errno != EAGAIN && errno != EINTR) {
+                perror("dequeue failed");
+                // 尝试恢复而不是直接退出
+                sleep(1);
+            }
             continue;
         }
         
         uint64_t timestamp = get_time_ns();
         
-        // 保存临时文件
-        save_temp_frame(buffers[buf_index].start[0], bytes_used, frame_counter);
+        // 只在有客户端连接时保存临时文件，减少磁盘I/O
+        if (client_connected) {
+            if (save_temp_frame(buffers[buf_index].start[0], bytes_used, frame_counter) < 0) {
+                printf("Warning: failed to save temp frame %d\n", frame_counter);
+            }
+        }
         
-        // 通知USB发送线程
-        pthread_mutex_lock(&frame_mutex);
-        current_frame.data = buffers[buf_index].start[0];
-        current_frame.size = bytes_used;
-        current_frame.frame_id = frame_counter;
-        current_frame.timestamp = timestamp;
-        pthread_cond_signal(&frame_ready);
-        pthread_mutex_unlock(&frame_mutex);
+        // 通知USB发送线程（仅在有客户端时）
+        if (client_connected) {
+            pthread_mutex_lock(&frame_mutex);
+            current_frame.data = buffers[buf_index].start[0];
+            current_frame.size = bytes_used;
+            current_frame.frame_id = frame_counter;
+            current_frame.timestamp = timestamp;
+            pthread_cond_signal(&frame_ready);
+            pthread_mutex_unlock(&frame_mutex);
+        }
         
         // 重新队列缓冲区
         if (queue_buffer_mp(fd, buf_index) < 0) {
             perror("queue failed");
-            break;
+            // 尝试恢复而不是直接退出
+            sleep(1);
+            continue;
         }
         
         frame_counter++;
         frames_in_second++;
         
-        // 统计信息
+        // 统计信息 - 减少输出频率，每5秒输出一次
         uint64_t current_time = get_time_ns();
-        if (current_time - last_stats_time >= 1000000000ULL) {  // 1秒
-            printf("Frame %d, FPS: %d, Bytes: %zu\n", 
-                   frame_counter, frames_in_second, bytes_used);
+        if (current_time - last_stats_time >= 5000000000ULL) {  // 5秒
+            // 检查/dev/shm使用情况
+            system("df -h /dev/shm | tail -1 | awk '{print \"[SHMDISK]\" $3 \"/\" $2 \" (\" $5 \")\"}'");
+            
+            printf("Frame %d, FPS: %d, Bytes: %zu, Connected: %s\n", 
+                   frame_counter, frames_in_second/5, bytes_used, 
+                   client_connected ? "YES" : "NO");
             frames_in_second = 0;
             last_stats_time = current_time;
         }
@@ -471,10 +510,25 @@ int main(int argc, char *argv[]) {
     printf("V4L2 USB RAW Image Streamer for Luckfox Pico Mini B\n");
     printf("===================================================\n");
     printf("Port: %d\n", port);
+    printf("Server IP: %s\n", DEFAULT_SERVER_IP);
+    
+    // 检查系统资源
+    printf("Checking system resources...\n");
+    system("free -m | head -2 | tail -1 | awk '{print \"Memory: \" $3 \"/\" $2 \" MB used\"}'");
+    system("df -h /dev/shm | tail -1 | awk '{print \"/dev/shm: \" $3 \"/\" $2 \" used (\" $5 \")\"}'");
+    
+    // 清理旧的临时文件
+    printf("Cleaning old temp files...\n");
+    for (int i = 0; i < MAX_TEMP_FILES; i++) {
+        char filename[256];
+        snprintf(filename, sizeof(filename), TEMP_FILE_TEMPLATE, i);
+        unlink(filename);  // 删除可能存在的旧文件
+    }
     
     // 设置信号处理
     signal(SIGINT, signal_handler);
     signal(SIGTERM, signal_handler);
+    signal(SIGPIPE, SIG_IGN);  // 忽略SIGPIPE信号
     
     // 创建服务器
     server_fd = create_server(port);
