@@ -34,18 +34,22 @@ set(CMAKE_C_FLAGS "-O3 -march=armv8-a -mtune=cortex-a55 -mfpu=neon-fp-armv8 -mfl
 set(CMAKE_EXE_LINKER_FLAGS "-Wl,--gc-sections -lrt")
 
 # 添加可执行文件
-add_executable(v4l2_bench v4l2_bench.c)
+add_executable(v4l2_bench source/v4l2_bench.c)
+add_executable(v4l2_bench_mp source/v4l2_bench_mp.c)
+add_executable(test_multiplanar source/test_multiplanar.c)
 
 # 链接数学库（如果需要浮点运算）
 target_link_libraries(v4l2_bench m rt)
+target_link_libraries(v4l2_bench_mp m rt)
+target_link_libraries(test_multiplanar m rt)
 
 # 安装规则（可选）
-install(TARGETS v4l2_bench
+install(TARGETS v4l2_bench v4l2_bench_mp test_multiplanar
         RUNTIME DESTINATION bin
         PERMISSIONS OWNER_EXECUTE OWNER_WRITE OWNER_READ)
 
 # 添加自定义目标用于部署（可选）
 add_custom_target(deploy
-    COMMAND scp v4l2_bench ${TARGET_USER}@${TARGET_IP}:${TARGET_PATH}
-    COMMENT "Deploying v4l2_bench to target device"
-    DEPENDS v4l2_bench)
+    COMMAND scp v4l2_bench v4l2_bench_mp test_multiplanar ${TARGET_USER}@${TARGET_IP}:${TARGET_PATH}
+    COMMENT "Deploying executables to target device"
+    DEPENDS v4l2_bench v4l2_bench_mp test_multiplanar)
