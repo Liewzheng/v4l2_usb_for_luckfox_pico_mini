@@ -20,8 +20,8 @@
 #include <signal.h>
 #include <pthread.h>
 
-#define WIDTH 2048
-#define HEIGHT 1296
+#define WIDTH 1920
+#define HEIGHT 1080
 #define PIXELFORMAT V4L2_PIX_FMT_SBGGR10
 #define BUFFER_COUNT 3  // 减少缓冲区数量
 
