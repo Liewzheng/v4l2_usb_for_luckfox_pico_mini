@@ -333,8 +333,8 @@ int receive_loop(socket_t sock) {
     uint8_t *frame_buffer = NULL;
     size_t buffer_size = 0;
     int save_enabled = 1;
-    int save_interval = 10;  // 每10帧保存一次
-    
+    int save_interval = 1;  // 每1帧保存一次
+
     printf("Starting receive loop (Ctrl+C to stop)...\n");
     printf("Frames will be saved to: %s\n", OUTPUT_DIR);
     
