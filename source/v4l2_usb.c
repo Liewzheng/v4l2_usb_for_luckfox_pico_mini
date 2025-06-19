@@ -27,6 +27,7 @@
 
 // USB传输配置
 #define DEFAULT_PORT 8888
+#define DEFAULT_SERVER_IP "172.32.0.100"  // Luckfox Pico 默认IP
 #define HEADER_SIZE 32
 #define CHUNK_SIZE 65536  // 64KB chunks for network transfer
 
@@ -261,7 +262,7 @@ int create_server(int port) {
     
     memset(&addr, 0, sizeof(addr));
     addr.sin_family = AF_INET;
-    addr.sin_addr.s_addr = INADDR_ANY;
+    addr.sin_addr.s_addr = inet_addr(DEFAULT_SERVER_IP);
     addr.sin_port = htons(port);
     
     if (bind(fd, (struct sockaddr*)&addr, sizeof(addr)) < 0) {
@@ -276,7 +277,7 @@ int create_server(int port) {
         return -1;
     }
     
-    printf("Server listening on port %d\n", port);
+    printf("Server listening on %s:%d\n", DEFAULT_SERVER_IP, port);
     return fd;
 }
 
