@@ -1,1 +1,4 @@
 build/
+*.sh
+*.exe
+v4l2_usb_pc
