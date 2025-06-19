@@ -37,19 +37,21 @@ set(CMAKE_EXE_LINKER_FLAGS "-Wl,--gc-sections -lrt")
 add_executable(v4l2_bench source/v4l2_bench.c)
 add_executable(v4l2_bench_mp source/v4l2_bench_mp.c)
 add_executable(test_multiplanar source/test_multiplanar.c)
+add_executable(v4l2_usb source/v4l2_usb.c)
 
 # 链接数学库（如果需要浮点运算）
 target_link_libraries(v4l2_bench m rt)
 target_link_libraries(v4l2_bench_mp m rt)
 target_link_libraries(test_multiplanar m rt)
+target_link_libraries(v4l2_usb m rt pthread)
 
 # 安装规则（可选）
-install(TARGETS v4l2_bench v4l2_bench_mp test_multiplanar
+install(TARGETS v4l2_bench v4l2_bench_mp test_multiplanar v4l2_usb
         RUNTIME DESTINATION bin
         PERMISSIONS OWNER_EXECUTE OWNER_WRITE OWNER_READ)
 
 # 添加自定义目标用于部署（可选）
 add_custom_target(deploy
-    COMMAND scp v4l2_bench v4l2_bench_mp test_multiplanar ${TARGET_USER}@${TARGET_IP}:${TARGET_PATH}
+    COMMAND scp v4l2_bench v4l2_bench_mp test_multiplanar v4l2_usb ${TARGET_USER}@${TARGET_IP}:${TARGET_PATH}
     COMMENT "Deploying executables to target device"
-    DEPENDS v4l2_bench v4l2_bench_mp test_multiplanar)
+    DEPENDS v4l2_bench v4l2_bench_mp test_multiplanar v4l2_usb)
