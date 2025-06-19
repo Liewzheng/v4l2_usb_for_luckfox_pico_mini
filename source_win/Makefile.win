@@ -1,0 +1,33 @@
+# Makefile for Windows (MinGW/TDM-GCC)
+CC = gcc
+CFLAGS = -Wall -Wextra -O2 -std=c99
+LDFLAGS = -lws2_32
+
+# 目标文件
+TARGET = v4l2_usb_pc.exe
+SOURCE = v4l2_usb_pc_win.c
+
+# 默认目标
+all: $(TARGET)
+
+# 编译规则
+$(TARGET): $(SOURCE)
+	$(CC) $(CFLAGS) -o $(TARGET) $(SOURCE) $(LDFLAGS)
+	@echo "Build complete: $(TARGET)"
+
+# 清理
+clean:
+	del /Q $(TARGET) 2>nul
+	rmdir /S /Q received_frames 2>nul
+	@echo "Clean complete"
+
+# 测试
+test: $(TARGET)
+	$(TARGET) --help
+
+# 创建接收目录
+setup:
+	mkdir received_frames 2>nul
+	@echo "Created received_frames directory"
+
+.PHONY: all clean test setup
