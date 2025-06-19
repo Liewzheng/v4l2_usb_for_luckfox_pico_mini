@@ -3,3 +3,6 @@ cmake --build build --config Release
 
 cd source_linux_x86_64
 make
+
+cd ../source_win_x86_64
+make

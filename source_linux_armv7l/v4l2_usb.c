@@ -29,7 +29,7 @@
 #define DEFAULT_PORT 8888
 #define DEFAULT_SERVER_IP "172.32.0.93"  // Luckfox Pico 默认IP
 #define HEADER_SIZE 32
-#define CHUNK_SIZE 32768  // 减少块大小为32KB
+#define CHUNK_SIZE 65536  // 恢复为64KB以提高网络效率
 
 // 多平面缓冲区结构
 struct buffer {

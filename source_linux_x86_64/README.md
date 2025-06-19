@@ -31,7 +31,7 @@ make -C build v4l2_usb
 
 ### PC端 (本地编译)
 ```bash
-cd source_pc
+cd source_linux_x86_64
 make
 # 或者使用gcc直接编译
 gcc -o v4l2_usb_pc v4l2_usb_pc.c -lm
