@@ -408,7 +408,7 @@ void print_usage(const char *prog_name) {
     printf("  -p, --port PORT     Server port (default: %d)\n", DEFAULT_PORT);
     printf("  -o, --output DIR    Output directory (default: %s)\n", OUTPUT_DIR);
     printf("\nExample:\n");
-    printf("  %s -s 172.32.0.100 -p 8888 -o ./frames\n", prog_name);
+    printf("  %s -s 172.32.0.93 -p 8888 -o ./frames\n", prog_name);
     printf("\nNote: On Windows, use forward slashes or double backslashes for paths\n");
     printf("  Good: ./frames or .\\\\frames\n");
     printf("  Bad:  .\\frames\n");

@@ -44,14 +44,14 @@ gcc -Wall -Wextra -O2 -std=c99 -o v4l2_usb_pc.exe v4l2_usb_pc_win.c -lws2_32
 REM 查看帮助
 v4l2_usb_pc.exe --help
 
-REM 连接到默认地址 (172.32.0.100:8888)
+REM 连接到默认地址 (172.32.0.93:8888)
 v4l2_usb_pc.exe
 
 REM 指定服务器地址
-v4l2_usb_pc.exe -s 172.32.0.100 -p 8888
+v4l2_usb_pc.exe -s 172.32.0.93 -p 8888
 
 REM 指定输出目录
-v4l2_usb_pc.exe -s 172.32.0.100 -o ./frames
+v4l2_usb_pc.exe -s 172.32.0.93 -o ./frames
 ```
 
 ### Windows 特定注意事项
@@ -67,7 +67,7 @@ v4l2_usb_pc.exe -s 172.32.0.100 -o ./frames
 
 3. **网络配置**:
    - 确保 Windows 和 Luckfox Pico 在同一网络
-   - 检查 IP 地址配置 (默认: 172.32.0.100)
+   - 检查 IP 地址配置 (默认: 172.32.0.93)
 
 ### 故障排除
 
@@ -110,11 +110,11 @@ connect failed: 10061
 ```
 V4L2 USB RAW Image Receiver (Cross-Platform PC Client)
 =====================================================
-Server: 172.32.0.100:8888
+Server: 172.32.0.93:8888
 Output: ./received_frames
 Windows Socket initialized
 Created output directory: ./received_frames
-Connecting to 172.32.0.100:8888...
+Connecting to 172.32.0.93:8888...
 Connected successfully!
 Starting receive loop (Ctrl+C to stop)...
 Frames will be saved to: ./received_frames

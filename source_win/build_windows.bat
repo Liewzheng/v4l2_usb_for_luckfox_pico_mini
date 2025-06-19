@@ -21,8 +21,8 @@ if %ERRORLEVEL% eq 0 (
     echo.
     echo Usage examples:
     echo   v4l2_usb_pc.exe --help
-    echo   v4l2_usb_pc.exe -s 172.32.0.100 -p 8888
-    echo   v4l2_usb_pc.exe -s 172.32.0.100 -o ./frames
+    echo   v4l2_usb_pc.exe -s 172.32.0.93 -p 8888
+    echo   v4l2_usb_pc.exe -s 172.32.0.93 -o ./frames
     echo.
 ) else (
     echo Build failed!

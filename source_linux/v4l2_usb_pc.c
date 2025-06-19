@@ -15,7 +15,7 @@
 #define _POSIX_C_SOURCE 199309L
 
 // 默认配置
-#define DEFAULT_SERVER_IP "172.32.0.100"  // Luckfox Pico 默认IP
+#define DEFAULT_SERVER_IP "172.32.0.93"  // Luckfox Pico 默认IP
 #define DEFAULT_PORT 8888
 #define OUTPUT_DIR "./received_frames"
 #define MAX_FILENAME_LEN 256

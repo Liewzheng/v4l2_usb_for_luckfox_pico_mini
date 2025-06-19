@@ -9,8 +9,8 @@
 ## 网络配置
 
 ### 默认 IP 配置
-- **Luckfox Pico**: `172.32.0.100:8888` (服务器)
-- **PC客户端**: 连接到 `172.32.0.100:8888`
+- **Luckfox Pico**: `172.32.0.93:8888` (服务器)
+- **PC客户端**: 连接到 `172.32.0.93:8888`
 
 ### 网络要求
 - 确保 PC 和 Luckfox Pico 在同一网络段
@@ -47,7 +47,7 @@ gcc -o v4l2_usb_pc.exe v4l2_usb_pc_win.c -lws2_32
 
 #### 上传到 Luckfox Pico
 ```bash
-scp build/v4l2_usb build/v4l2_bench_mp root@172.32.0.100:/root/Workspace/
+scp build/v4l2_usb build/v4l2_bench_mp root@172.32.0.93:/root/Workspace/
 ```
 
 ### 3. 运行系统
@@ -69,14 +69,14 @@ scp build/v4l2_usb build/v4l2_bench_mp root@172.32.0.100:/root/Workspace/
 ```bash
 ./v4l2_usb_pc
 # 或指定参数
-./v4l2_usb_pc -s 172.32.0.100 -p 8888 -o ./frames
+./v4l2_usb_pc -s 172.32.0.93 -p 8888 -o ./frames
 ```
 
 **Windows:**
 ```cmd
 v4l2_usb_pc.exe
 # 或指定参数
-v4l2_usb_pc.exe -s 172.32.0.100 -p 8888 -o ./frames
+v4l2_usb_pc.exe -s 172.32.0.93 -p 8888 -o ./frames
 ```
 
 ## 使用场景
@@ -143,7 +143,7 @@ connect failed: Connection refused
 **解决方案:**
 - 检查 Luckfox Pico 是否已启动服务器
 - 确认 IP 地址和端口正确
-- 检查网络连通性: `ping 172.32.0.100`
+- 检查网络连通性: `ping 172.32.0.93`
 
 #### 2. 权限错误 (Luckfox Pico)
 ```
