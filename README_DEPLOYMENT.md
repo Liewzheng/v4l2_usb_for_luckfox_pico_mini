@@ -40,7 +40,7 @@ build_windows.bat
 # 或
 mingw32-make -f Makefile.win
 # 或手动
-gcc -o v4l2_usb_pc.exe v4l2_usb_pc_win.c -lws2_32
+gcc -o v4l2_usb_pc.exe v4l2_usb_pc.c -lws2_32
 ```
 
 ### 2. 部署到设备

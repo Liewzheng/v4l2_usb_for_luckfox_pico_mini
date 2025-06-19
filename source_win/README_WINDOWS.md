@@ -33,7 +33,7 @@ mingw32-make -f Makefile.win
 
 #### 方法3: 手动编译
 ```cmd
-gcc -Wall -Wextra -O2 -std=c99 -o v4l2_usb_pc.exe v4l2_usb_pc_win.c -lws2_32
+gcc -Wall -Wextra -O2 -std=c99 -o v4l2_usb_pc.exe v4l2_usb_pc.c -lws2_32
 ```
 
 ### 运行程序
@@ -75,7 +75,7 @@ v4l2_usb_pc.exe -s 172.32.0.93 -o ./frames
 ```
 error: sys/socket.h: No such file or directory
 ```
-**解决**: 使用 `v4l2_usb_pc_win.c` 而不是 `v4l2_usb_pc.c`
+**解决**: 使用 `v4l2_usb_pc.c` 而不是 `v4l2_usb_pc.c`
 
 #### 运行时错误
 ```
@@ -96,7 +96,7 @@ connect failed: 10061
 
 1. **编译优化**:
    ```cmd
-   gcc -O3 -march=native -o v4l2_usb_pc.exe v4l2_usb_pc_win.c -lws2_32
+   gcc -O3 -march=native -o v4l2_usb_pc.exe v4l2_usb_pc.c -lws2_32
    ```
 
 2. **运行时优化**:

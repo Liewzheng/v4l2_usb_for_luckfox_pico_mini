@@ -14,7 +14,7 @@ if %ERRORLEVEL% neq 0 (
 )
 
 REM Compile the program
-gcc -Wall -Wextra -O2 -std=c99 -o v4l2_usb_pc.exe v4l2_usb_pc_win.c -lws2_32
+gcc -Wall -Wextra -O2 -std=c99 -o v4l2_usb_pc.exe v4l2_usb_pc.c -lws2_32
 
 if %ERRORLEVEL% eq 0 (
     echo Build successful: v4l2_usb_pc.exe
