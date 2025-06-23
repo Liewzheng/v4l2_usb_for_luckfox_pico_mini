@@ -24,8 +24,8 @@
 
 #ifdef _WIN32
 // Windows平台专用头文件和定义
-#include <windows.h>
 #include <winsock2.h>
+#include <windows.h>
 #include <ws2tcpip.h>
 // 注意：使用编译器链接选项而不是pragma
 #define ssize_t int                      /**< Windows下的ssize_t类型定义 */
