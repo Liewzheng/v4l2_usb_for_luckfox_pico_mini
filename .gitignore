@@ -11,3 +11,4 @@ v4l2_usb_pc
 .clang-format
 
 luckfox_v4l2*/
+.vscode/
