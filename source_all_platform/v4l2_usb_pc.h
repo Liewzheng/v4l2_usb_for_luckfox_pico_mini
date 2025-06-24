@@ -144,6 +144,7 @@ struct client_config {
     const char* output_dir;      /**< 输出目录 */
     int enable_conversion;       /**< 是否启用SBGGR10转换 */
     int save_interval;           /**< 保存间隔 */
+    int enable_save;             /**< 是否启用文件保存 (0=仅内存, 1=保存文件) */
 };
 
 // ========================== 全局变量声明 ==========================
@@ -181,7 +182,9 @@ void signal_handler(int sig);
 // 图像数据处理函数
 int save_frame(const uint8_t* data, size_t size, uint32_t frame_id,
                uint32_t width, uint32_t height, uint32_t pixfmt,
-               int enable_conversion);
+               int enable_conversion, const char* output_dir);
+int process_frame_memory_only(const uint8_t* data, size_t size, uint32_t frame_id,
+                             uint32_t pixfmt, int enable_conversion);
 void print_frame_info(const struct frame_header* header);
 
 // SBGGR10解包函数

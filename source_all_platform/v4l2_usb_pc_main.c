@@ -25,12 +25,17 @@ void print_usage(const char* prog_name)
     printf("  -h, --help          Show this help message\n");
     printf("  -s, --server IP     Server IP address (default: %s)\n", DEFAULT_SERVER_IP);
     printf("  -p, --port PORT     Server port (default: %d)\n", DEFAULT_PORT);
-    printf("  -o, --output DIR    Output directory (default: %s)\n", OUTPUT_DIR);
+    printf("  -S, --save-path DIR Save frames to directory (default: memory only)\n");
+    printf("  -o, --output DIR    Alias for --save-path (deprecated)\n");
     printf("  -c, --convert       Enable SBGGR10 to 16-bit conversion (default: disabled)\n");
     printf("  -i, --interval N    Save every Nth frame (default: 1)\n");
+    printf("\nSave Modes:\n");
+    printf("  Memory-only (default): Frames processed in RAM, real-time overwrite\n");
+    printf("  File save (-S DIR):    Frames saved to disk for analysis\n");
     printf("\nExample:\n");
-    printf("  %s -s 172.32.0.93 -p 8888 -o ./frames\n", prog_name);
-    printf("  %s -s 172.32.0.93 -c -i 5    # Enable conversion, save every 5th frame\n", prog_name);
+    printf("  %s -s 172.32.0.93                    # Memory-only mode\n", prog_name);
+    printf("  %s -s 172.32.0.93 -S ./frames       # Save to files\n", prog_name);
+    printf("  %s -s 172.32.0.93 -S ./frames -c -i 5  # Save + convert every 5th frame\n", prog_name);
     printf("\nNote: On Windows, use forward slashes or double backslashes for paths\n");
     printf("  Good: ./frames or .\\\\frames\n");
     printf("  Bad:  .\\frames\n");
@@ -44,9 +49,10 @@ int parse_arguments(int argc, char* argv[], struct client_config* config)
     // 设置默认值
     config->server_ip = DEFAULT_SERVER_IP;
     config->port = DEFAULT_PORT;
-    config->output_dir = OUTPUT_DIR;
-    config->enable_conversion = 0;  // 默认不启用转换
+    config->output_dir = NULL;           // 默认不保存到文件
+    config->enable_conversion = 0;       // 默认不启用转换
     config->save_interval = 1;
+    config->enable_save = 0;             // 默认仅内存模式
 
     // 解析命令行参数
     for (int i = 1; i < argc; i++) {
@@ -74,9 +80,21 @@ int parse_arguments(int argc, char* argv[], struct client_config* config)
                 return -1;
             }
         }
-        else if (strcmp(argv[i], "-o") == 0 || strcmp(argv[i], "--output") == 0) {
+        else if (strcmp(argv[i], "-S") == 0 || strcmp(argv[i], "--save-path") == 0) {
             if (++i < argc) {
                 config->output_dir = argv[i];
+                config->enable_save = 1;    // 启用文件保存
+            } else {
+                printf("Error: --save-path requires a directory path\n");
+                return -1;
+            }
+        }
+        else if (strcmp(argv[i], "-o") == 0 || strcmp(argv[i], "--output") == 0) {
+            // 保持兼容性，但提示使用新参数
+            printf("Warning: -o/--output is deprecated, use -S/--save-path instead\n");
+            if (++i < argc) {
+                config->output_dir = argv[i];
+                config->enable_save = 1;    // 启用文件保存
             } else {
                 printf("Error: --output requires a directory path\n");
                 return -1;
@@ -104,6 +122,11 @@ int parse_arguments(int argc, char* argv[], struct client_config* config)
         }
     }
 
+    // 如果没有指定保存路径，设置为默认输出目录（仅用于显示）
+    if (!config->enable_save) {
+        config->output_dir = "[Memory Only]";
+    }
+
     return 0;  // 成功解析
 }
 
@@ -125,8 +148,13 @@ int main(int argc, char* argv[])
     printf("V4L2 USB RAW Image Receiver (Cross-Platform PC Client)\n");
     printf("=====================================================\n");
     printf("Server: %s:%d\n", config.server_ip, config.port);
-    printf("Output: %s\n", config.output_dir);
-    printf("Save interval: every %d frame(s)\n", config.save_interval);
+    printf("Mode: %s\n", config.enable_save ? "File Save" : "Memory Only");
+    if (config.enable_save) {
+        printf("Save path: %s\n", config.output_dir);
+        printf("Save interval: every %d frame(s)\n", config.save_interval);
+    } else {
+        printf("Storage: Real-time memory processing (no file save)\n");
+    }
 
     // 显示处理特性信息
     printf("\nImage Processing Features:\n");
@@ -140,10 +168,18 @@ int main(int argc, char* argv[])
 #else
         printf("- Scalar processing (no SIMD acceleration)\n");
 #endif
-        printf("- Output: RAW files + unpacked 16-bit files for SBGGR10\n");
+        if (config.enable_save) {
+            printf("- Output: RAW files + unpacked 16-bit files for SBGGR10\n");
+        } else {
+            printf("- Processing: In-memory SBGGR10 conversion (no file output)\n");
+        }
     } else {
         printf("- SBGGR10 format conversion: DISABLED\n");
-        printf("- Output: RAW files only\n");
+        if (config.enable_save) {
+            printf("- Output: RAW files only\n");
+        } else {
+            printf("- Processing: In-memory only (no conversion, no file output)\n");
+        }
         printf("- Use -c option to enable conversion\n");
     }
     printf("\n");
@@ -166,11 +202,13 @@ int main(int argc, char* argv[])
         init_memory_pool();
     }
 
-    // 创建输出目录
-    if (create_output_dir(config.output_dir) < 0) {
-        cleanup_network();
-        cleanup_memory_pool();
-        return 1;
+    // 创建输出目录（仅在文件保存模式下）
+    if (config.enable_save) {
+        if (create_output_dir(config.output_dir) < 0) {
+            cleanup_network();
+            cleanup_memory_pool();
+            return 1;
+        }
     }
 
     // 连接到服务器

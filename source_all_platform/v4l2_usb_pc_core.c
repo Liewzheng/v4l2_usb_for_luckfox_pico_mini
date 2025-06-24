@@ -500,12 +500,17 @@ int unpack_sbggr10_image(const uint8_t *raw_data, size_t raw_size,
 // ========================== 图像数据处理函数 ==========================
 
 /**
- * @brief 保存接收到的图像帧数据到文件
+ * @brief 保存接收到的图像帧数据到文件（可选）
  */
 int save_frame(const uint8_t* data, size_t size, uint32_t frame_id,
                uint32_t width, uint32_t height, uint32_t pixfmt,
-               int enable_conversion)
+               int enable_conversion, const char* output_dir)
 {
+    // 如果没有指定输出目录，则不保存文件
+    if (!output_dir) {
+        return 0;  // 内存模式，直接返回成功
+    }
+
     char filename[MAX_FILENAME_LEN];
     int ret = 0;
 
@@ -517,7 +522,7 @@ int save_frame(const uint8_t* data, size_t size, uint32_t frame_id,
 
     // 保存原始RAW数据
     snprintf(filename, sizeof(filename), "%s/frame_%06d_%dx%d.%s",
-             OUTPUT_DIR, frame_id, width, height, ext);
+             output_dir, frame_id, width, height, ext);
 
     FILE* fp = fopen(filename, "wb");
     if (!fp) {
@@ -549,7 +554,7 @@ int save_frame(const uint8_t* data, size_t size, uint32_t frame_id,
             if (unpack_sbggr10_image(data, size, unpacked_pixels, num_pixels) == 0) {
                 // 保存解包后的16位数据
                 snprintf(filename, sizeof(filename), "%s/frame_%06d_%dx%d_unpacked.raw",
-                        OUTPUT_DIR, frame_id, width, height);
+                        output_dir, frame_id, width, height);
                 
                 FILE* fp_unpacked = fopen(filename, "wb");
                 if (fp_unpacked) {
@@ -582,6 +587,54 @@ int save_frame(const uint8_t* data, size_t size, uint32_t frame_id,
     }
 
     return ret;
+}
+
+/**
+ * @brief 仅在内存中处理图像帧数据（不保存文件）
+ */
+int process_frame_memory_only(const uint8_t* data, size_t size, uint32_t frame_id,
+                              uint32_t pixfmt, int enable_conversion)
+{
+    // 仅处理SBGGR10格式转换（如果启用）
+    if (enable_conversion && pixfmt == 0x30314742 && size % 5 == 0) {
+        size_t num_pixels = size / 5 * 4;
+        uint16_t* unpacked_pixels = NULL;
+        
+        // 尝试使用预分配的内存池
+        if (g_unpack_buffer && num_pixels <= g_buffer_size) {
+            unpacked_pixels = g_unpack_buffer;
+        } else {
+            unpacked_pixels = (uint16_t*)malloc(num_pixels * sizeof(uint16_t));
+        }
+        
+        if (unpacked_pixels) {
+            if (unpack_sbggr10_image(data, size, unpacked_pixels, num_pixels) == 0) {
+                // 数据已在内存中处理完成，无需保存文件
+                static int process_count = 0;
+                process_count++;
+                if (process_count <= 3 || process_count % 100 == 0) {
+                    printf("Frame %d: SBGGR10 converted in memory (%zu pixels)\n", 
+                           frame_id, num_pixels);
+                }
+            } else {
+                printf("Failed to unpack SBGGR10 data in memory\n");
+                if (unpacked_pixels != g_unpack_buffer) {
+                    free(unpacked_pixels);
+                }
+                return -1;
+            }
+            
+            // 只有不是预分配缓冲区时才需要释放
+            if (unpacked_pixels != g_unpack_buffer) {
+                free(unpacked_pixels);
+            }
+        } else {
+            printf("Failed to allocate memory for processing (%zu pixels)\n", num_pixels);
+            return -1;
+        }
+    }
+    
+    return 0;
 }
 
 /**
@@ -655,8 +708,13 @@ int receive_loop(socket_t sock, const struct client_config* config)
     size_t buffer_size = 0;
 
     printf("Starting receive loop (Ctrl+C to stop)...\n");
-    printf("Frames will be saved to: %s\n", config->output_dir);
-    printf("SBGGR10 conversion: %s\n", config->enable_conversion ? "Enabled" : "Disabled");
+    if (config->enable_save) {
+        printf("Frames will be saved to: %s\n", config->output_dir);
+        printf("SBGGR10 conversion: %s\n", config->enable_conversion ? "Enabled" : "Disabled");
+    } else {
+        printf("Memory-only mode: No files will be saved\n");
+        printf("SBGGR10 processing: %s\n", config->enable_conversion ? "In-memory conversion" : "No processing");
+    }
 
     while (running) {
         struct frame_header header;
@@ -697,15 +755,28 @@ int receive_loop(socket_t sock, const struct client_config* config)
         // 打印帧信息
         print_frame_info(&header);
 
-        // 保存帧（根据设置）
+        // 处理帧（保存或仅内存处理）
         if (header.frame_id % config->save_interval == 0) {
-            if (save_frame(frame_buffer, header.size, header.frame_id,
-                          header.width, header.height, header.pixfmt,
-                          config->enable_conversion) == 0) {
-                if (config->enable_conversion && header.pixfmt == 0x30314742) {
-                    printf("  -> Saved RAW + unpacked files\n");
-                } else {
-                    printf("  -> Saved RAW file\n");
+            if (config->enable_save) {
+                // 文件保存模式
+                if (save_frame(frame_buffer, header.size, header.frame_id,
+                              header.width, header.height, header.pixfmt,
+                              config->enable_conversion, config->output_dir) == 0) {
+                    if (config->enable_conversion && header.pixfmt == 0x30314742) {
+                        printf("  -> Saved RAW + unpacked files\n");
+                    } else {
+                        printf("  -> Saved RAW file\n");
+                    }
+                }
+            } else {
+                // 仅内存处理模式
+                if (process_frame_memory_only(frame_buffer, header.size, header.frame_id,
+                                            header.pixfmt, config->enable_conversion) == 0) {
+                    if (config->enable_conversion && header.pixfmt == 0x30314742) {
+                        printf("  -> Processed in memory (converted)\n");
+                    } else {
+                        printf("  -> Processed in memory (raw)\n");
+                    }
                 }
             }
         }
