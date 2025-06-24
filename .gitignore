@@ -1,6 +1,7 @@
 build/
 build_*/
 release*/
+toolchains/
 *.exe
 *.tar.gz
 *.zip
