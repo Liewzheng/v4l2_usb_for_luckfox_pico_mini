@@ -437,5 +437,5 @@ find "${RELEASE_DIR}" -type f | sort
 
 echo ""
 log_success "Embedded release package v${VERSION} created successfully!"
-log_info "Deploy to device: scp -r ${RELEASE_DIR}/luckfox_pico_armv7l user@device_ip:~/"
-log_info "Then run on device: cd luckfox_pico_armv7l && ./run_v4l2_usb.sh"
+# log_info "Deploy to device: scp -r ${RELEASE_DIR}/luckfox_pico_armv7l user@device_ip:~/"
+# log_info "Then run on device: cd luckfox_pico_armv7l && ./run_v4l2_usb.sh"
