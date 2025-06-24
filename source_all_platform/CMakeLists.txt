@@ -119,65 +119,106 @@ endif()
 
 # 编译器特定优化
 if(CMAKE_C_COMPILER_ID STREQUAL "GNU" OR CMAKE_C_COMPILER_ID STREQUAL "Clang")
+    # 根据目标平台选择合适的架构优化
+    set(ARCH_FLAGS "")
+    if(WIN32)
+        # Windows x86_64 交叉编译使用通用的 x86_64 优化
+        set(ARCH_FLAGS "-march=x86-64;-mtune=generic")
+    elseif(APPLE)
+        # macOS 本地编译可以使用 native
+        if(CMAKE_CROSSCOMPILING)
+            set(ARCH_FLAGS "-march=armv8-a")
+        else()
+            set(ARCH_FLAGS "-march=native")
+        endif()
+    else()
+        # Linux 本地编译可以使用 native，交叉编译使用通用设置
+        if(CMAKE_CROSSCOMPILING)
+            # 检查目标架构
+            if(CMAKE_SYSTEM_PROCESSOR MATCHES "x86_64|amd64")
+                set(ARCH_FLAGS "-march=x86-64;-mtune=generic")
+            elseif(CMAKE_SYSTEM_PROCESSOR MATCHES "aarch64|arm64")
+                set(ARCH_FLAGS "-march=armv8-a")
+            else()
+                set(ARCH_FLAGS "-march=native")
+            endif()
+        else()
+            set(ARCH_FLAGS "-march=native")
+        endif()
+    endif()
+    
     # GCC/Clang优化选项
     target_compile_options(v4l2_usb_pc_static PRIVATE 
         -Wall -Wextra -Wpedantic
-        $<$<CONFIG:Release>:-O3 -march=native -DNDEBUG>
+        $<$<CONFIG:Release>:-O3 ${ARCH_FLAGS} -DNDEBUG>
         $<$<CONFIG:Debug>:-O0 -g3 -DDEBUG>
     )
     target_compile_options(v4l2_usb_pc_shared PRIVATE 
         -Wall -Wextra -Wpedantic
-        $<$<CONFIG:Release>:-O3 -march=native -DNDEBUG>
+        $<$<CONFIG:Release>:-O3 ${ARCH_FLAGS} -DNDEBUG>
         $<$<CONFIG:Debug>:-O0 -g3 -DDEBUG>
     )
     target_compile_options(v4l2_usb_pc PRIVATE 
         -Wall -Wextra -Wpedantic
-        $<$<CONFIG:Release>:-O3 -march=native -DNDEBUG>
+        $<$<CONFIG:Release>:-O3 ${ARCH_FLAGS} -DNDEBUG>
         $<$<CONFIG:Debug>:-O0 -g3 -DDEBUG>
     )
     
     # SIMD支持检测
     include(CheckCSourceCompiles)
     
-    # 检测AVX2支持
-    set(CMAKE_REQUIRED_FLAGS "-mavx2")
-    check_c_source_compiles("
-        #include <immintrin.h>
-        int main() {
-            __m256i a = _mm256_setzero_si256();
-            return 0;
-        }
-    " HAVE_AVX2)
-    
-    if(HAVE_AVX2)
+    # 对于交叉编译到 Windows x86_64，我们可以安全地假设 AVX2 支持
+    if(WIN32 AND CMAKE_CROSSCOMPILING)
+        # Windows x86_64 交叉编译默认启用 AVX2
         target_compile_options(v4l2_usb_pc_static PRIVATE -mavx2)
         target_compile_options(v4l2_usb_pc_shared PRIVATE -mavx2)
         target_compile_options(v4l2_usb_pc PRIVATE -mavx2)
         target_compile_definitions(v4l2_usb_pc_static PRIVATE __AVX2__)
         target_compile_definitions(v4l2_usb_pc_shared PRIVATE __AVX2__)
         target_compile_definitions(v4l2_usb_pc PRIVATE __AVX2__)
-        message(STATUS "AVX2 support enabled")
+        message(STATUS "AVX2 support enabled (cross-compilation default)")
     else()
-        # 检测SSE2支持
-        set(CMAKE_REQUIRED_FLAGS "-msse2")
+        # 本地编译时进行 SIMD 检测
+        # 检测AVX2支持
+        set(CMAKE_REQUIRED_FLAGS "-mavx2")
         check_c_source_compiles("
-            #include <emmintrin.h>
+            #include <immintrin.h>
             int main() {
-                __m128i a = _mm_setzero_si128();
+                __m256i a = _mm256_setzero_si256();
                 return 0;
             }
-        " HAVE_SSE2)
+        " HAVE_AVX2)
         
-        if(HAVE_SSE2)
-            target_compile_options(v4l2_usb_pc_static PRIVATE -msse2)
-            target_compile_options(v4l2_usb_pc_shared PRIVATE -msse2)
-            target_compile_options(v4l2_usb_pc PRIVATE -msse2)
-            target_compile_definitions(v4l2_usb_pc_static PRIVATE __SSE2__)
-            target_compile_definitions(v4l2_usb_pc_shared PRIVATE __SSE2__)
-            target_compile_definitions(v4l2_usb_pc PRIVATE __SSE2__)
-            message(STATUS "SSE2 support enabled")
+        if(HAVE_AVX2)
+            target_compile_options(v4l2_usb_pc_static PRIVATE -mavx2)
+            target_compile_options(v4l2_usb_pc_shared PRIVATE -mavx2)
+            target_compile_options(v4l2_usb_pc PRIVATE -mavx2)
+            target_compile_definitions(v4l2_usb_pc_static PRIVATE __AVX2__)
+            target_compile_definitions(v4l2_usb_pc_shared PRIVATE __AVX2__)
+            target_compile_definitions(v4l2_usb_pc PRIVATE __AVX2__)
+            message(STATUS "AVX2 support enabled")
         else()
-            message(STATUS "No SIMD support detected")
+            # 检测SSE2支持
+            set(CMAKE_REQUIRED_FLAGS "-msse2")
+            check_c_source_compiles("
+                #include <emmintrin.h>
+                int main() {
+                    __m128i a = _mm_setzero_si128();
+                    return 0;
+                }
+            " HAVE_SSE2)
+            
+            if(HAVE_SSE2)
+                target_compile_options(v4l2_usb_pc_static PRIVATE -msse2)
+                target_compile_options(v4l2_usb_pc_shared PRIVATE -msse2)
+                target_compile_options(v4l2_usb_pc PRIVATE -msse2)
+                target_compile_definitions(v4l2_usb_pc_static PRIVATE __SSE2__)
+                target_compile_definitions(v4l2_usb_pc_shared PRIVATE __SSE2__)
+                target_compile_definitions(v4l2_usb_pc PRIVATE __SSE2__)
+                message(STATUS "SSE2 support enabled")
+            else()
+                message(STATUS "No SIMD support detected")
+            endif()
         endif()
     endif()
     

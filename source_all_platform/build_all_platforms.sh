@@ -141,6 +141,8 @@ set(CMAKE_SYSTEM_PROCESSOR arm64)
 set(CMAKE_OSX_ARCHITECTURES arm64)
 set(CMAKE_OSX_DEPLOYMENT_TARGET "11.0")
 EOF
+
+
     
     log_info "Available build targets:"
     echo "  1. native   - Native platform (current system)"
@@ -187,6 +189,7 @@ EOF
                 fi
             fi
             ;;
+
             
         "all")
             log_info "Building all supported platforms..."
@@ -252,7 +255,6 @@ EOF
     else
         log_info "For cross-compilation on macOS:"
         log_info "  Windows: Install MinGW-w64 via Homebrew: brew install mingw-w64"
-        log_info "  Linux: Use Docker or cross-compilation toolchain"
     fi
 }
 
