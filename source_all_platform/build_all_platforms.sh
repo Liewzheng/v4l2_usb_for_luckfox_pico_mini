@@ -69,7 +69,13 @@ build_platform() {
     cmake ${cmake_args} ..
     
     # 构建
-    cmake --build . --config Release --parallel $(nproc 2>/dev/null || echo 4)
+    # macOS 使用 sysctl -n hw.ncpu 获取 CPU 核心数，Linux 使用 nproc
+    if [[ "$OSTYPE" == "darwin"* ]]; then
+        CPU_CORES=$(sysctl -n hw.ncpu 2>/dev/null || echo 4)
+    else
+        CPU_CORES=$(nproc 2>/dev/null || echo 4)
+    fi
+    cmake --build . --config Release --parallel ${CPU_CORES}
     
     # 显示构建信息
     cmake --build . --target build_info
@@ -139,7 +145,11 @@ EOF
     log_info "Available build targets:"
     echo "  1. native   - Native platform (current system)"
     echo "  2. windows  - Windows x86_64 (requires MinGW-w64)"
-    echo "  3. macos    - macOS ARM64 (experimental, requires macOS SDK)"
+    if [[ "$OSTYPE" == "darwin"* ]]; then
+        echo "  3. macos    - macOS native build (current system)"
+    else
+        echo "  3. macos    - macOS ARM64 (cross-compilation, requires osxcross)"
+    fi
     echo "  4. all      - All supported platforms"
     
     # 解析命令行参数
@@ -161,14 +171,20 @@ EOF
             ;;
             
         "macos")
-            log_warning "macOS cross-compilation is experimental and requires macOS SDK"
-            if [ -d "/opt/osxcross" ]; then
-                export PATH="/opt/osxcross/bin:$PATH"
-                build_platform "macos_arm64" "toolchains/macos_arm64.cmake" ""
+            # 检测当前是否在 macOS 上运行
+            if [[ "$OSTYPE" == "darwin"* ]]; then
+                log_info "Building natively on macOS..."
+                build_platform "macos_native" "" ""
             else
-                log_error "macOS cross-compilation toolchain not found"
-                log_info "You need to set up osxcross: https://github.com/tpoechtrager/osxcross"
-                exit 1
+                log_warning "macOS cross-compilation is experimental and requires macOS SDK"
+                if [ -d "/opt/osxcross" ]; then
+                    export PATH="/opt/osxcross/bin:$PATH"
+                    build_platform "macos_arm64" "toolchains/macos_arm64.cmake" ""
+                else
+                    log_error "macOS cross-compilation toolchain not found"
+                    log_info "You need to set up osxcross: https://github.com/tpoechtrager/osxcross"
+                    exit 1
+                fi
             fi
             ;;
             
@@ -186,7 +202,10 @@ EOF
             fi
             
             # macOS build (if available)
-            if [ -d "/opt/osxcross" ]; then
+            if [[ "$OSTYPE" == "darwin"* ]]; then
+                log_info "Building natively on macOS..."
+                build_platform "macos_native" "" ""
+            elif [ -d "/opt/osxcross" ]; then
                 export PATH="/opt/osxcross/bin:$PATH"
                 build_platform "macos_arm64" "toolchains/macos_arm64.cmake" ""
             else
@@ -210,17 +229,31 @@ EOF
             log_info "Build directory: ${build_dir}"
             dist_dir="${build_dir}/dist"
             if [ -d "${dist_dir}" ]; then
-                find "${dist_dir}" -type f -executable -o -name "*.exe" -o -name "*.so" -o -name "*.dylib" -o -name "*.a" | while read -r file; do
-                    size=$(du -h "${file}" | cut -f1)
-                    log_success "  $(basename "${file}") (${size}) - ${file}"
-                done
+                # macOS 和 Linux 的 find 命令语法不同
+                if [[ "$OSTYPE" == "darwin"* ]]; then
+                    find "${dist_dir}" -type f \( -perm +111 -o -name "*.exe" -o -name "*.so" -o -name "*.dylib" -o -name "*.a" \) | while read -r file; do
+                        size=$(du -h "${file}" | cut -f1)
+                        log_success "  $(basename "${file}") (${size}) - ${file}"
+                    done
+                else
+                    find "${dist_dir}" -type f -executable -o -name "*.exe" -o -name "*.so" -o -name "*.dylib" -o -name "*.a" | while read -r file; do
+                        size=$(du -h "${file}" | cut -f1)
+                        log_success "  $(basename "${file}") (${size}) - ${file}"
+                    done
+                fi
             fi
         fi
     done
     
     log_success "Multi-platform build completed!"
-    log_info "Install MinGW-w64 for Windows cross-compilation: sudo apt install gcc-mingw-w64-x86-64"
-    log_info "Install osxcross for macOS cross-compilation: https://github.com/tpoechtrager/osxcross"
+    if [[ "$OSTYPE" != "darwin"* ]]; then
+        log_info "Install MinGW-w64 for Windows cross-compilation: sudo apt install gcc-mingw-w64-x86-64"
+        log_info "Install osxcross for macOS cross-compilation: https://github.com/tpoechtrager/osxcross"
+    else
+        log_info "For cross-compilation on macOS:"
+        log_info "  Windows: Install MinGW-w64 via Homebrew: brew install mingw-w64"
+        log_info "  Linux: Use Docker or cross-compilation toolchain"
+    fi
 }
 
 # 运行主函数
