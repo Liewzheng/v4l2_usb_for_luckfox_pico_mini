@@ -34,10 +34,10 @@ set(CMAKE_C_FLAGS "-O3 -march=armv8-a -mtune=cortex-a55 -mfpu=neon-fp-armv8 -mfl
 set(CMAKE_EXE_LINKER_FLAGS "-Wl,--gc-sections -lrt")
 
 # 添加可执行文件
-add_executable(v4l2_bench source_linux_armv7l/v4l2_bench.c)
-add_executable(v4l2_bench_mp source_linux_armv7l/v4l2_bench_mp.c)
-add_executable(test_multiplanar source_linux_armv7l/test_multiplanar.c)
-add_executable(v4l2_usb source_linux_armv7l/v4l2_usb.c)
+add_executable(v4l2_bench v4l2_bench.c)
+add_executable(v4l2_bench_mp v4l2_bench_mp.c)
+add_executable(test_multiplanar test_multiplanar.c)
+add_executable(v4l2_usb v4l2_usb.c)
 
 # 链接数学库（如果需要浮点运算）
 target_link_libraries(v4l2_bench m rt)
