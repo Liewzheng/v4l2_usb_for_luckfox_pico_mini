@@ -1,6 +1,8 @@
 build/
-*.sh
+build_*/
+release*/
 *.exe
-*.txt
+*.tar.gz
+*.zip
 v4l2_usb_pc
 .clang-format
