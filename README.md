@@ -68,28 +68,23 @@ v4l2_bench/
 │   ├── CMakeLists.txt                # 🔨 CMake 构建配置
 │   ├── build_all_platforms.sh        # 🌐 一键构建所有平台
 │   ├── create_release.sh             # 📦 自动打包发布脚本
-│   ├── toolchains/                   # 🔧 交叉编译工具链
-│   │   ├── windows_x86_64.cmake      # Windows 交叉编译
-│   │   └── macos_arm64.cmake         # macOS 交叉编译
-│   ├── build_*/                      # 🏗️ 各平台构建目录
-│   ├── release_v2.0.0/               # 📦 发布包目录
-│   └── *.tar.gz, *.zip              # 📁 压缩发布包
+│   ├── verify_unpacked.py            # � 16-bit 解包验证工具
+│   └── README.md                     # � PC 端说明文档
 ├── 🔧 source_linux_armv7l/           # 🎯 嵌入式 ARM 平台源码
 │   ├── v4l2_usb.c                    # 🔥 网络推流服务器 (嵌入式端)
 │   ├── v4l2_bench.c                  # 📊 单平面基准测试
 │   ├── v4l2_bench_mp.c               # 📈 多平面格式基准测试  
 │   ├── test_multiplanar.c            # 🧪 多平面 API 验证程序
 │   ├── CMakeLists.txt                # 🔨 ARM 构建配置
-│   ├── create_release.sh             # 📦 嵌入式端发布脚本
-│   ├── build/                        # 🏗️ ARM 构建产物
-│   │   ├── v4l2_usb                  # 主服务器程序
-│   │   ├── v4l2_bench                # 性能测试
-│   │   ├── v4l2_bench_mp             # 多平面测试
-│   │   └── test_multiplanar          # API 验证
-│   ├── release_embedded_v2.0.0/      # 📦 嵌入式发布包
-│   └── *.tar.gz, *.zip              # 📁 ARM 压缩包
-├── CMakeLists.txt                    # 🔨 根级 CMake 配置
-├── build.sh                          # 🚀 传统构建脚本 (兼容)
+│   └── create_release.sh             # 📦 嵌入式端发布脚本
+├── 🎨 source_python_gui/             # 🖼️ Python GUI 客户端
+│   ├── main.py                       # 🖥️ PySide6 GUI 主程序
+│   ├── test_client.py                # 🧪 C 库接口测试程序
+│   ├── requirements.txt              # 📋 Python 依赖列表
+│   └── libv4l2_usb_pc.dll           # 🔗 动态库 (自动生成)
+├── build.sh                          # � 传统构建脚本 (兼容)
+├── .gitignore                        # � Git 忽略文件配置
+├── .clang-format                     # 🎨 代码格式化配置
 └── README.md                         # 📖 本文档
 ```
 
@@ -98,40 +93,72 @@ v4l2_bench/
 ### 1. 系统架构
 
 ```
-┌─────────────────┐    网络推流     ┌─────────────────┐
-│   Luckfox Pico  │ ────────────► │   PC 客户端      │
-│                 │   TCP:8888    │                 │
-│ • v4l2_usb      │               │ • v4l2_usb_pc   │
-│ • SC3336 摄像头 │               │ • 帧数据保存     │
-│ • 172.32.0.93   │               │ • 实时显示       │
-└─────────────────┘               └─────────────────┘
+┌─────────────────┐    网络推流     ┌─────────────────────────┐
+│   Luckfox Pico  │ ────────────► │   PC 客户端              │
+│                 │   TCP:8888    │                         │
+│ • v4l2_usb      │               │ • v4l2_usb_pc (命令行)   │
+│ • SC3336 摄像头 │               │ • Python GUI (图形界面)  │
+│ • 172.32.0.93   │               │ • 16-bit RAW 图像显示    │
+└─────────────────┘               └─────────────────────────┘
 ```
 
-### 2. 网络配置
+### 2. 三种使用方式
 
-#### 🖥️ PC 端编译 (全平台支持)
+#### 🎨 方式1: Python GUI (推荐新用户)
+```bash
+cd source_python_gui
 
+# 安装 Python 依赖
+pip install -r requirements.txt
+
+# 构建 C 动态库
+cd ../source_all_platform
+mkdir -p build && cd build
+cmake -DBUILD_SHARED_LIBS=ON .. && make
+cp libv4l2_usb_pc.so ../source_python_gui/  # Linux
+# 或 cp libv4l2_usb_pc.dll ../source_python_gui/  # Windows
+
+# 启动 GUI
+cd ../../source_python_gui
+python main.py
+```
+
+#### ⚡ 方式2: 预编译版本 (即开即用)
+```bash
+# 下载发布包
+# � [PC 端多平台包](source_all_platform/v4l2_usb_pc_v2.0.0_all_platforms.zip)
+# 📥 [嵌入式 ARM 包](source_linux_armv7l/v4l2_usb_embedded_v2.0.0_luckfox_pico_armv7l.tar.gz)
+
+# PC 端使用
+tar -xf v4l2_usb_pc_v2.0.0_linux_x86_64.tar.gz    # Linux
+cd linux_x86_64 && ./run.sh                       # 启动
+
+# 嵌入式端部署
+scp v4l2_usb_embedded_v2.0.0_luckfox_pico_armv7l.tar.gz root@172.32.0.93:~/
+ssh root@172.32.0.93
+tar -xf v4l2_usb_embedded_v2.0.0_luckfox_pico_armv7l.tar.gz
+cd luckfox_pico_armv7l && ./run_v4l2_usb.sh
+```
+
+#### 🔨 方式3: 自定义编译 (开发者)
+
+**PC 端编译**:
 ```bash
 cd source_all_platform
 
-# 一键构建所有平台 (推荐)
-./build_all_platforms.sh
+# 构建命令行版本
+mkdir -p build && cd build
+cmake .. && make
 
-# 或分别构建
-mkdir build_native && cd build_native
-cmake .. && make                                    # Linux 本地
-
-mkdir build_windows && cd build_windows  
-cmake -DCMAKE_TOOLCHAIN_FILE=../toolchains/windows_x86_64.cmake .. && make  # Windows
-
-mkdir build_macos && cd build_macos
-cmake -DCMAKE_TOOLCHAIN_FILE=../toolchains/macos_arm64.cmake .. && make     # macOS
+# 构建动态库 (给 Python GUI 使用)
+mkdir -p build_shared && cd build_shared
+cmake -DBUILD_SHARED_LIBS=ON .. && make
 
 # 生成发布包
-./create_release.sh
+cd .. && ./create_release.sh
 ```
 
-#### 🔧 嵌入式端编译 (ARM)
+**嵌入式端编译**:
 
 ```bash
 cd source_linux_armv7l
@@ -217,38 +244,62 @@ cd source_all_platform/build_windows_x86_64
 
 ## 🛠️ 使用场景
 
-### 场景1: 快速开始 (预编译版本)
+### 场景1: 图形界面实时查看 (Python GUI)
 ```bash
-# 嵌入式端
-cd luckfox_pico_armv7l && ./run_v4l2_usb.sh
+# 启动 Python GUI
+cd source_python_gui
+python main.py
 
-# PC 端 (Linux)
-cd linux_x86_64 && ./run.sh
-
-# PC 端 (Windows) 
-cd windows_x86_64 && run.bat
+# GUI 功能:
+# • 16-bit RAW 图像实时显示 (类似 ImageJ)
+# • 自动对比度调整 (1%-99% 分位数拉伸)
+# • 灰度/伪彩色模式切换
+# • 图像统计信息显示 (Min/Max/Mean/Std)
+# • 保存模式选择 (仅内存/保存到文件)
+# • 实时帧率和连接状态监控
 ```
 
-### 场景2: 指定保存目录
+### 场景2: 命令行批量处理
 ```bash
-# 修改启动脚本或使用自编译版本
-./v4l2_usb_pc -o /path/to/save/frames -c
+# 命令行版本 - 适合脚本自动化
+./v4l2_usb_pc -s 172.32.0.93 -o ./saved_frames -c -i 5
+# -c: 启用 SBGGR10 到 16-bit 转换
+# -i 5: 每 5 帧保存一次
 ```
 
 ### 场景3: 自定义网络配置
 ```bash
 # 如果 Luckfox Pico 使用不同 IP
+# GUI 方式: 在界面中修改服务器 IP
+# 命令行方式:
 ./v4l2_usb_pc -s 192.168.1.100 -p 8888 -c
 ```
 
-### 场景4: 多客户端接收
+### 场景4: 多客户端同时接收
 ```bash
 # 可同时启动多个客户端连接同一服务器
-./v4l2_usb_pc -o ./client1_frames -c &
-./v4l2_usb_pc -o ./client2_frames -c &
+# 方式1: 多个 GUI 实例
+python main.py &  # GUI 客户端1
+python main.py &  # GUI 客户端2
+
+# 方式2: GUI + 命令行混合
+python main.py &                           # GUI 实时查看
+./v4l2_usb_pc -o ./batch_save -c -i 10 &  # 后台批量保存
 ```
 
-### 场景5: 性能测试
+### 场景5: 图像质量分析
+```bash
+# 使用验证工具检查 16-bit 转换质量
+cd source_all_platform
+python verify_unpacked.py [16bit_file.raw]
+
+# GUI 中查看实时统计:
+# • 像素值范围 (Min/Max)
+# • 图像亮度 (Mean)
+# • 对比度 (Std)
+```
+
+### 场景6: 性能基准测试
 ```bash
 # 嵌入式端性能基准测试
 cd luckfox_pico_armv7l && ./run_benchmark.sh
@@ -265,16 +316,36 @@ cd luckfox_pico_armv7l && ./run_benchmark.sh
 ```
 - `port`: 监听端口 (默认: 8888)
 
-### v4l2_usb_pc (客户端)
+### v4l2_usb_pc (命令行客户端)
 ```bash
-./v4l2_usb_pc [-s server_ip] [-p port] [-o output_dir] [-c] [-i interval] [-h]
+./v4l2_usb_pc [-s server_ip] [-p port] [-S save_path] [-c] [-i interval] [-h]
 ```
 - `-s server_ip`: 服务器IP地址 (默认: 172.32.0.93)
 - `-p port`: 服务器端口 (默认: 8888)
-- `-o output_dir`: 帧数据保存目录 (默认: ./received_frames)
+- `-S save_path`: 帧数据保存目录 (默认: 仅内存模式)
 - `-c, --convert`: 启用 SBGGR10 到 16-bit 转换
 - `-i interval`: 保存间隔，每N帧保存一次 (默认: 1)
 - `-h, --help`: 显示帮助信息
+
+### Python GUI (图形界面客户端)
+```bash
+cd source_python_gui
+python main.py
+```
+**GUI 功能特性**:
+- 🖼️ **实时图像显示**: 16-bit RAW 图像，类似 ImageJ 体验
+- 📊 **图像分析**: 自动对比度、统计信息 (Min/Max/Mean/Std)
+- 🎨 **显示模式**: 灰度/伪彩色切换
+- 💾 **保存控制**: 仅内存模式 / 文件保存模式
+- 📈 **性能监控**: 实时帧率、连接状态、传输速度
+- ⚙️ **参数配置**: 服务器 IP/端口、保存路径设置
+
+**GUI 操作方式**:
+1. 在界面中设置服务器 IP 和端口
+2. 选择保存模式 (仅内存 或 指定保存路径)
+3. 点击"开始接收"连接服务器
+4. 实时查看 16-bit RAW 图像和统计信息
+5. 使用"停止接收"断开连接
 
 ## 🎁 发布包说明
 
@@ -319,28 +390,66 @@ luckfox_pico_armv7l/
 
 ## ❓ 常见问题
 
-### Q1: 连接失败 "Connection refused"
+### Q1: Python GUI 启动失败
+**原因**: Python 依赖未安装或 C 动态库缺失
+**解决**:
+```bash
+# 安装 Python 依赖
+cd source_python_gui
+pip install -r requirements.txt
+
+# 构建 C 动态库
+cd ../source_all_platform
+mkdir -p build && cd build
+cmake -DBUILD_SHARED_LIBS=ON .. && make
+
+# 复制动态库到 GUI 目录
+cp libv4l2_usb_pc.so ../source_python_gui/    # Linux
+# 或 cp libv4l2_usb_pc.dll ../source_python_gui/  # Windows
+```
+
+### Q2: GUI 显示黑屏或模拟图像
+**原因**: C 库未正确获取到实际图像数据
+**解决**:
+1. 确认嵌入式端正在推流: 检查服务器输出
+2. 检查网络连接状态: GUI 中查看连接状态
+3. 确认 SBGGR10 转换已启用: C 库会自动转换为 16-bit
+4. 重启 GUI 程序重新连接
+
+### Q3: 16-bit 图像显示异常
+**原因**: 图像数据范围或格式问题
+**解决**:
+```bash
+# 使用验证工具检查数据
+cd source_all_platform
+python verify_unpacked.py [16bit_file.raw]
+
+# 在 GUI 中查看图像统计信息
+# 检查 Min/Max/Mean/Std 值是否合理
+```
+
+### Q4: 连接失败 "Connection refused"
 **原因**: 网络不通或服务器未启动
 **解决**:
 1. 检查网络连接: `ping 172.32.0.93`
 2. 确认服务器已启动: 在 Luckfox Pico 上运行 `./v4l2_usb`
 3. 检查防火墙设置
 
-### Q2: 帧率很低或卡顿
+### Q5: 帧率很低或卡顿
 **原因**: 网络带宽不足
 **解决**:
 1. 使用千兆以太网
 2. 减少网络负载
 3. 检查网络质量: `iperf3` 测速
 
-### Q3: "No such file or directory" 错误
+### Q6: "No such file or directory" 错误
 **原因**: 摄像头设备未找到
 **解决**:
 1. 检查摄像头连接: `ls /dev/video*`
 2. 确认驱动加载: `dmesg | grep -i video`
 3. 重新插拔摄像头
 
-### Q4: 编译错误
+### Q7: 编译错误
 **解决**:
 ```bash
 # 确保依赖库已安装
@@ -354,13 +463,13 @@ cmake ..
 make
 ```
 
-### Q5: Windows 编译问题
+### Q8: Windows 编译问题
 **解决**:
 1. 安装 MinGW-w64
 2. 确保 `gcc` 在 PATH 中
 3. 使用 `build_windows.bat` 自动编译
 
-### Q6: 程序无法正常退出
+### Q9: 程序无法正常退出
 **解决**: 使用 `Ctrl+C` 发送 SIGINT 信号，程序会优雅退出并清理资源
 
 ## 🔍 调试与监控
@@ -449,9 +558,12 @@ cd .. && ./create_release.sh                 # 打包嵌入式
 ### v2.0.0 (当前版本)
 - ✅ **全面重构**: 代码模块化，易于维护
 - ✅ **跨平台支持**: Windows、Linux、macOS、ARM Linux
+- ✅ **Python GUI**: PySide6 图形界面，16-bit RAW 图像实时显示
+- ✅ **图像处理**: SBGGR10→16bit 转换，自动对比度，伪彩色映射
+- ✅ **性能优化**: 多线程解包，SIMD 加速，内存池管理
 - ✅ **自动化构建**: 一键编译、打包、发布
 - ✅ **即开即用**: 预编译二进制文件
-- ✅ **增强功能**: SBGGR10转换、帧间隔控制
+- ✅ **双模式运行**: 命令行批处理 + GUI 实时查看
 - ✅ **完善文档**: 详细使用说明和故障排除
 
 ### v1.0.0 (传统版本)
@@ -462,6 +574,6 @@ cd .. && ./create_release.sh                 # 打包嵌入式
 ---
 
 **📝 版本**: v2.0.0  
-**🏷️ 标签**: V4L2, RAW10, 网络推流, 嵌入式, 跨平台, 高性能  
+**🏷️ 标签**: V4L2, RAW10, 网络推流, 嵌入式, 跨平台, Python GUI, 16-bit 图像处理  
 **📅 更新**: 2025年6月最新版本  
-**🔗 架构**: 模块化 • 自动化 • 即开即用
+**🔗 架构**: 模块化 • 自动化 • 即开即用 • 图形界面
