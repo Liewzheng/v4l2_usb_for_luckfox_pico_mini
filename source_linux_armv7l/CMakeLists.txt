@@ -7,18 +7,18 @@ set(CMAKE_SYSTEM_PROCESSOR arm)
 
 # 指定工具链路径
 set(TOOLCHAIN_PATH "/home/liewzheng/Workspace/luckfox-pico/tools/linux/toolchain/arm-rockchip830-linux-uclibcgnueabihf/bin")
-set(TOOLCHAIN_PREFIX "arm-rockchip830-linux-uclibcgnueabihf")
+set(TOOLCHAIN_PREFIX "${TOOLCHAIN_PATH}/arm-rockchip830-linux-uclibcgnueabihf-")
 
 # 设置交叉编译器
-set(CMAKE_C_COMPILER ${TOOLCHAIN_PATH}/${TOOLCHAIN_PREFIX}-gcc)
-set(CMAKE_CXX_COMPILER ${TOOLCHAIN_PATH}/${TOOLCHAIN_PREFIX}-g++)
+set(CMAKE_C_COMPILER ${TOOLCHAIN_PREFIX}gcc)
+set(CMAKE_CXX_COMPILER ${TOOLCHAIN_PREFIX}g++)
 
 # 设置其他工具
-set(CMAKE_AR ${TOOLCHAIN_PATH}/${TOOLCHAIN_PREFIX}-ar CACHE FILEPATH "Archiver")
-set(CMAKE_RANLIB ${TOOLCHAIN_PATH}/${TOOLCHAIN_PREFIX}-ranlib CACHE FILEPATH "Ranlib")
-set(CMAKE_OBJCOPY ${TOOLCHAIN_PATH}/${TOOLCHAIN_PREFIX}-objcopy CACHE FILEPATH "Object Copy")
-set(CMAKE_STRIP ${TOOLCHAIN_PATH}/${TOOLCHAIN_PREFIX}-strip CACHE FILEPATH "Strip")
-set(CMAKE_SIZE ${TOOLCHAIN_PATH}/${TOOLCHAIN_PREFIX}-size CACHE FILEPATH "Size")
+set(CMAKE_AR ${TOOLCHAIN_PREFIX}ar CACHE FILEPATH "Archiver")
+set(CMAKE_RANLIB ${TOOLCHAIN_PREFIX}ranlib CACHE FILEPATH "Ranlib")
+set(CMAKE_OBJCOPY ${TOOLCHAIN_PREFIX}objcopy CACHE FILEPATH "Object Copy")
+set(CMAKE_STRIP ${TOOLCHAIN_PREFIX}strip CACHE FILEPATH "Strip")
+set(CMAKE_SIZE ${TOOLCHAIN_PREFIX}size CACHE FILEPATH "Size")
 
 # 设置系统根目录
 set(SYSROOT ${TOOLCHAIN_PATH}/../arm-rockchip830-linux-uclibcgnueabihf/sysroot)
